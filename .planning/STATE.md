@@ -9,15 +9,15 @@ See: .planning/PROJECT.md (updated 2026-05-21)
 
 ## Current Status
 
-**Phase:** 0 — Projeto inicializado, pronto para planejamento da Phase 1
+**Phase:** 1 ✅ COMPLETA — Fundação implementada e commitada
 **Mode:** YOLO
-**Last action:** Project initialized via /gsd-new-project
+**Last action:** Phase 1 executada — 15 arquivos criados, 0 erros de sintaxe
 
 ## Phase Progress
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | Fundação — OpenWA + Claude + Google Sheets | ⏳ Not started |
+| 1 | Fundação — OpenWA + Claude + Google Sheets | ✅ Completa |
 | 2 | Catálogo Inteligente & FAQ | ⏳ Not started |
 | 3 | Filiais, Serviços & Contexto Local | ⏳ Not started |
 | 4 | Registro de Leads & Histórico | ⏳ Not started |
@@ -26,7 +26,9 @@ See: .planning/PROJECT.md (updated 2026-05-21)
 
 ## Context for Next Session
 
-- Run `/gsd-discuss-phase 1` or `/gsd-plan-phase 1` to start Phase 1
+- Phase 1 completa — próximo: `/gsd-execute-phase 2`
+- Antes de rodar: copiar `.env.example` → `.env` e preencher `ANTHROPIC_API_KEY` e `GOOGLE_SHEETS_SCRIPT_URL`
+- Para testar: `npm start` (exibe QR Code no terminal)
 - Google Sheets App Script URL: `https://script.google.com/macros/s/AKfycbxsyIkg8pdFutoCO6KlXqCPFM-LqSPwtn4EpG6yX63k02Ui5qi4E_b_wL_oWIjedLoS/exec`
 - OpenWA reference: `https://github.com/rmyndharis/OpenWA`
 - Claude API key: available in developer's env
