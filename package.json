@@ -1,0 +1,32 @@
+{
+  "name": "auto-zap-aria",
+  "version": "1.0.0",
+  "description": "ARIA — Bot de atendimento WhatsApp trilíngue (ES/PT/EN) com Claude API e Google Sheets",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest"
+  },
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "claude",
+    "anthropic",
+    "aria",
+    "atendimento"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.97.1",
+    "dotenv": "^17.4.2",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.34.7",
+    "winston": "^3.19.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
