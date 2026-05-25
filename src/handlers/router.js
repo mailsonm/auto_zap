@@ -10,7 +10,7 @@
  */
 
 import logger from '../logger.js';
-import { chat } from '../claude.js';
+import { chat, clearSession, setSessionLanguage } from '../claude.js';
 import { checkRateLimit, getRateLimitMessage } from '../middleware/rateLimit.js';
 import {
   getSession,
@@ -67,10 +67,14 @@ export async function handleMessage(msg, toolOptions = {}) {
 
   logger.info('Mensagem recebida', { phone, length: text.length });
 
+  // Obter (ou criar) sessão para este número
+  const session = getSession(phone);
+
   // ── Rate Limiting ──────────────────────────────────────────────────────────
-  const { allowed, retryAfterMs } = checkRateLimit(phone);
+  const { allowed, retryAfterMs, inCooldown } = checkRateLimit(phone);
   if (!allowed) {
-    return getRateLimitMessage(retryAfterMs);
+    const lang = session?.language || 'es';
+    return getRateLimitMessage(retryAfterMs, lang, inCooldown);
   }
 
   // ── Human Takeover Ativo ───────────────────────────────────────────────────
@@ -79,7 +83,14 @@ export async function handleMessage(msg, toolOptions = {}) {
     return null; // Humano está atendendo — ARIA não interfere
   }
 
-  const session = getSession(phone);
+  // Detecção ativa de idioma na sessão
+  const detectedLang = detectLanguage(text);
+  if (detectedLang) {
+    session.language = detectedLang;
+    setSessionLanguage(phone, detectedLang);
+    logger.info(`Idioma detectado e atualizado: ${detectedLang}`, { phone });
+  }
+
   incrementTurn(phone);
 
   // ── Pedido de Atendimento Humano ───────────────────────────────────────────
@@ -95,6 +106,9 @@ export async function handleMessage(msg, toolOptions = {}) {
       );
     }
 
+    // Limpar histórico Claude correspondente
+    clearSession(phone);
+
     const lang = session.language || 'es';
     const msg = HANDOFF_MESSAGES[lang] || HANDOFF_MESSAGES.es;
     logger.info('Encaminhamento para humano', { phone, language: lang });
@@ -109,4 +123,37 @@ export async function handleMessage(msg, toolOptions = {}) {
     logger.error('Erro ao processar mensagem', { phone, error: err.message });
     return '😔 Disculpa, tuve un problema. Por favor intenta de nuevo.';
   }
+}
+
+/**
+ * Detecção leve de idioma baseada em vocabulário comum.
+ * @param {string} text
+ * @returns {'pt'|'es'|'en'|null}
+ */
+export function detectLanguage(text) {
+  const clean = text.toLowerCase();
+  
+  const ptWords = /(?<=^|[^a-záéíóúçñãõâêîôûàèìòù])(?:olá|ola|bom\s+dia|boa\s+tarde|boa\s+noite|obrigado|obrigada|tchau|filial|filiais|endereço|endereco|preço|preços|preco|precos|você|voce|tem|onde|quero|preciso|por\s+favor)(?=[^a-záéíóúçñãõâêîôûàèìòù]|$)/gi;
+  const esWords = /(?<=^|[^a-záéíóúçñãõâêîôûàèìòù])(?:hola|buenos\s+dias|buenos\s+días|buenas\s+tardes|buenas\s+noches|gracias|adios|adiós|sucursal|sucursales|dirección|direccion|precio|precios|tienen|donde|dónde|quiero|necesito|por\s+favor)(?=[^a-záéíóúçñãõâêîôûàèìòù]|$)/gi;
+  const enWords = /(?<=^|[^a-záéíóúçñãõâêîôûàèìòù])(?:hello|hi|good\s+morning|good\s+afternoon|good\s+evening|thanks|thank\s+you|please|bye|goodbye|branch|branches|address|price|prices|where|want|need|have)(?=[^a-záéíóúçñãõâêîôûàèìòù]|$)/gi;
+  
+  let ptScore = (clean.match(ptWords) || []).length;
+  let esScore = (clean.match(esWords) || []).length;
+  let enScore = (clean.match(enWords) || []).length;
+  
+  if (ptScore === 0 && esScore === 0 && enScore === 0) {
+    const ptShort = /(?<=^|[^a-záéíóúçñãõâêîôûàèìòù])(?:o|e|do|da|no|na|com|para|um|uma)(?=[^a-záéíóúçñãõâêîôûàèìòù]|$)/gi;
+    const esShort = /(?<=^|[^a-záéíóúçñãõâêîôûàèìòù])(?:el|y|del|al|con|para|un|una)(?=[^a-záéíóúçñãõâêîôûàèìòù]|$)/gi;
+    const enShort = /(?<=^|[^a-záéíóúçñãõâêîôûàèìòù])(?:the|and|of|to|with|for|an|you|is|are)(?=[^a-záéíóúçñãõâêîôûàèìòù]|$)/gi;
+    
+    ptScore = (clean.match(ptShort) || []).length;
+    esScore = (clean.match(esShort) || []).length;
+    enScore = (clean.match(enShort) || []).length;
+  }
+  
+  if (ptScore > esScore && ptScore > enScore) return 'pt';
+  if (esScore > ptScore && esScore > enScore) return 'es';
+  if (enScore > ptScore && enScore > esScore) return 'en';
+  
+  return null;
 }
