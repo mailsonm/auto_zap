@@ -82,7 +82,7 @@ export function cleanupSessions() {
 }
 
 // Cleanup automático a cada 10 minutos
-setInterval(cleanupSessions, 10 * 60_000);
+setInterval(cleanupSessions, 10 * 60_000).unref();
 
 // ─── Chat Principal ──────────────────────────────────────────────────────────
 

@@ -122,4 +122,4 @@ export function cleanupRateLimits() {
 }
 
 // Limpeza automática a cada 5 minutos
-setInterval(cleanupRateLimits, 5 * 60_000);
+setInterval(cleanupRateLimits, 5 * 60_000).unref();
