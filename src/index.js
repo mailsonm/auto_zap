@@ -6,11 +6,22 @@
  */
 
 import 'dotenv/config';
-import { Client, LocalAuth } from 'whatsapp-web.js';
+import whatsappWeb from 'whatsapp-web.js';
+const { Client, LocalAuth } = whatsappWeb;
 import qrcode from 'qrcode-terminal';
 import logger from './logger.js';
 import { handleMessage } from './handlers/router.js';
-import { getProducts, getFAQs, getBranches, getServices } from './sheets.js';
+import { getProducts, getFAQs, getBranches, getServices, onCacheRefresh } from './sheets.js';
+import { buildProductIndex, buildFAQIndex, buildBranchIndex, buildServiceIndex } from './tools/search.js';
+import { ARIA_TOOLS, executeTool } from './tools/index.js';
+import { startHealthServer, setWAConnected } from './health.js';
+import { sendWithDelay } from './middleware/messageQueue.js';
+
+// Registrar atualizadores automáticos de índice de busca fuzzy
+onCacheRefresh('productos', (data) => buildProductIndex(data));
+onCacheRefresh('faqs', (data) => buildFAQIndex(data));
+onCacheRefresh('sucursales', (data) => buildBranchIndex(data));
+onCacheRefresh('serviços', (data) => buildServiceIndex(data));
 
 // ─── Validação de Ambiente ────────────────────────────────────────────────────
 
@@ -21,6 +32,10 @@ if (missing.length > 0) {
   logger.error('Copie .env.example para .env e preencha os valores.');
   process.exit(1);
 }
+
+// ─── Health Check Server ───────────────────────────────────────────
+
+startHealthServer();
 
 // ─── Cliente WhatsApp ─────────────────────────────────────────────────────────
 
@@ -45,6 +60,11 @@ const client = new Client({
   }
 });
 
+// ─── Estado de Reconexão ──────────────────────────────────────────────────────
+
+const RECONNECT_DELAYS = [5000, 15000, 30000]; // 5s, 15s, 30s (backoff exponencial)
+let reconnectAttempts = 0;
+
 // ─── Eventos do Cliente ───────────────────────────────────────────────────────
 
 client.on('qr', (qr) => {
@@ -64,8 +84,8 @@ client.on('auth_failure', (msg) => {
 
 client.on('ready', async () => {
   logger.info('🚀 ARIA está online e pronta para atender!');
-
-  // Pré-carregar dados do Sheets no startup
+  setWAConnected(true);
+  reconnectAttempts = 0;
   await preloadData();
 });
 
@@ -86,11 +106,11 @@ client.on('disconnected', async (reason) => {
 
 client.on('message', async (msg) => {
   try {
-    const response = await handleMessage(msg);
+    const response = await handleMessage(msg, { tools: ARIA_TOOLS, executeTool });
 
     if (response) {
-      await msg.reply(response);
-      logger.debug('Resposta enviada', {
+      await sendWithDelay(msg, response);
+      logger.debug('Resposta enviada com delay humanizado', {
         to: msg.from,
         length: response.length
       });
