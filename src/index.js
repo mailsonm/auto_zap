@@ -1,5 +1,5 @@
 /**
- * ARIA — Entry Point
+ * Samantha — Entry Point
  *
  * Inicializa o cliente WhatsApp (whatsapp-web.js) e conecta todos os módulos.
  * Exibe QR Code no terminal para autenticação e mantém reconexão automática.
@@ -13,7 +13,7 @@ import logger from './logger.js';
 import { handleMessage } from './handlers/router.js';
 import { getProducts, getFAQs, getBranches, getServices, onCacheRefresh } from './sheets.js';
 import { buildProductIndex, buildFAQIndex, buildBranchIndex, buildServiceIndex } from './tools/search.js';
-import { ARIA_TOOLS, executeTool } from './tools/index.js';
+import { SAMANTHA_TOOLS, executeTool } from './tools/index.js';
 import { startHealthServer, setWAConnected } from './health.js';
 import { sendWithDelay } from './middleware/messageQueue.js';
 
@@ -188,7 +188,7 @@ client.on('change_state', async (state) => {
 
 client.on('message', async (msg) => {
   try {
-    const response = await handleMessage(msg, { tools: ARIA_TOOLS, executeTool });
+    const response = await handleMessage(msg, { tools: SAMANTHA_TOOLS, executeTool });
 
     if (response) {
       await sendWithDelay(msg, response);
@@ -240,18 +240,18 @@ async function preloadData() {
     }
   } catch (err) {
     logger.error('Falha ao pré-carregar dados', { error: err.message });
-    logger.warn('ARIA iniciará sem dados em cache — primeiro atendimento pode ser mais lento.');
+    logger.warn('Samantha iniciará sem dados em cache — primeiro atendimento pode ser mais lento.');
   }
 }
 
 // ─── Inicialização ────────────────────────────────────────────────────────────
 
 logger.info('='.repeat(50));
-logger.info('  ARIA — Bot de Atendimento WhatsApp');
-logger.info('  Powered by Claude API + whatsapp-web.js');
+logger.info('  Samantha — Bot de Atendimento WhatsApp');
+logger.info('  Powered by OpenAI API + whatsapp-web.js');
 logger.info('='.repeat(50));
 logger.info(`Ambiente: ${process.env.NODE_ENV || 'development'}`);
-logger.info(`Modelo Claude: ${process.env.CLAUDE_MODEL || 'claude-3-5-haiku-20241022'}`);
+logger.info(`Modelo OpenAI: ${process.env.OPENAI_MODEL || 'gpt-4o-mini'}`);
 logger.info(`Cliente WA ID: ${WA_CLIENT_ID}`);
 logger.info('Inicializando...');
 

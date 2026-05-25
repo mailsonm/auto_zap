@@ -1,16 +1,16 @@
 /**
- * Router Principal de Mensagens — ARIA
+ * Router Principal de Mensagens — Samantha
  *
  * Recebe mensagens do WhatsApp e orquestra:
  * 1. Rate limiting
  * 2. Verificação de human takeover
  * 3. Detecção de pedido de humano
- * 4. Chamada ao Claude (com tools quando disponíveis)
+ * 4. Chamada à OpenAI (com tools quando disponíveis)
  * 5. Registro de sessão
  */
 
 import logger from '../logger.js';
-import { chat, clearSession, setSessionLanguage } from '../claude.js';
+import { chat, clearSession, setSessionLanguage } from '../openai.js';
 import { checkRateLimit, getRateLimitMessage } from '../middleware/rateLimit.js';
 import {
   getSession,
@@ -80,7 +80,7 @@ export async function handleMessage(msg, toolOptions = {}) {
   // ── Human Takeover Ativo ───────────────────────────────────────────────────
   if (isHumanTakeover(phone)) {
     logger.info('Mensagem ignorada — human takeover ativo', { phone });
-    return null; // Humano está atendendo — ARIA não interfere
+    return null; // Humano está atendendo — Samantha não interfere
   }
 
   // Detecção ativa de idioma na sessão
@@ -106,7 +106,7 @@ export async function handleMessage(msg, toolOptions = {}) {
       );
     }
 
-    // Limpar histórico Claude correspondente
+    // Limpar histórico OpenAI correspondente
     clearSession(phone);
 
     const lang = session.language || 'es';
@@ -115,7 +115,7 @@ export async function handleMessage(msg, toolOptions = {}) {
     return msg;
   }
 
-  // ── Resposta ARIA via Claude ───────────────────────────────────────────────
+  // ── Resposta Samantha via OpenAI ───────────────────────────────────────────
   try {
     const response = await chat(phone, text, toolOptions);
     return response;

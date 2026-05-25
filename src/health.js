@@ -1,5 +1,5 @@
 /**
- * Health Check Server — ARIA
+ * Health Check Server — Samantha
  *
  * Servidor HTTP nativo (sem Express) exposto na porta 8080.
  * Endpoint: GET /health
@@ -11,7 +11,7 @@
 
 import http from 'http';
 import logger from './logger.js';
-import { sessions } from './claude.js';
+import { sessions } from './openai.js';
 
 // Estado interno do módulo (atualizado via setWAConnected)
 let waConnected = false;

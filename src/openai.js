@@ -1,27 +1,29 @@
 /**
- * Claude API Client — ARIA
+ * OpenAI API Client — Samantha
  *
- * Gerencia histórico de conversas por sessão e integra com Claude API.
- * Suporta tool use (function calling) para busca de produtos, FAQ, etc.
+ * Gerencia histórico de conversas por sessão e integra com a OpenAI API.
+ * Suporta tool use (Function Calling) para busca de produtos, FAQ, etc.
+ * Substitui o cliente Claude mantendo a mesma assinatura e interface.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import logger from './logger.js';
 import { getSystemPrompt } from './aria.js';
-import { getSystemInfo } from './sheets.js';
+import { getSystemInfo, appendHistory } from './sheets.js';
+import { closeSession } from './session.js';
 
-const MODEL = process.env.CLAUDE_MODEL || 'claude-3-5-haiku-20241022';
-const MAX_TOKENS = parseInt(process.env.CLAUDE_MAX_TOKENS) || 512;
+const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const MAX_TOKENS = parseInt(process.env.OPENAI_MAX_TOKENS) || 512;
 const MAX_HISTORY = parseInt(process.env.MAX_HISTORY_MESSAGES) || 20;
 const SESSION_TIMEOUT = parseInt(process.env.SESSION_TIMEOUT_MS) || 30 * 60_000;
 const MAX_TOOL_ITERATIONS = 3;
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
 });
 
 // Map<phone, { messages: Message[], lastActivity: number, language: string }>
-const sessions = new Map();
+export const sessions = new Map();
 
 // ─── Gerenciamento de Sessão ─────────────────────────────────────────────────
 
@@ -40,7 +42,7 @@ function getSession(phone) {
 }
 
 /**
- * Trimmar histórico para manter apenas as últimas N mensagens.
+ * Trimmar histórico para manter apenas as últimas N mensagens de chat simples.
  */
 function trimHistory(session) {
   if (session.messages.length > MAX_HISTORY) {
@@ -60,6 +62,16 @@ export function cleanupSessions() {
   let cleaned = 0;
   for (const [phone, session] of sessions) {
     if (now - session.lastActivity > SESSION_TIMEOUT) {
+      try {
+        const summary = closeSession(phone);
+        if (summary) {
+          appendHistory(summary).catch(err => {
+            logger.warn('Falha ao salvar histórico por timeout', { phone, error: err.message });
+          });
+        }
+      } catch (err) {
+        logger.warn('Erro ao fechar sessão no timeout', { phone, error: err.message });
+      }
       sessions.delete(phone);
       cleaned++;
     }
@@ -75,21 +87,21 @@ setInterval(cleanupSessions, 10 * 60_000);
 // ─── Chat Principal ──────────────────────────────────────────────────────────
 
 /**
- * Enviar mensagem ao Claude e obter resposta.
+ * Enviar mensagem à OpenAI (GPT) e obter resposta.
  *
  * @param {string} phone — número de telefone (ex: "595981234567@c.us")
  * @param {string} userMessage — mensagem do cliente
  * @param {object} [options]
- * @param {Array}  [options.tools] — definições de tools para tool use
+ * @param {Array}  [options.tools] — definições de tools no formato Anthropic
  * @param {Function} [options.executeTool] — dispatcher de tools
- * @returns {Promise<string>} — resposta da ARIA
+ * @returns {Promise<string>} — resposta da Samantha
  */
 export async function chat(phone, userMessage, options = {}) {
   const { tools = null, executeTool = null } = options;
   const session = getSession(phone);
   session.lastActivity = Date.now();
 
-  // Adicionar mensagem do usuário ao histórico
+  // Adicionar mensagem do usuário ao histórico local (formato simples)
   session.messages.push({ role: 'user', content: userMessage });
 
   // Obter dados da empresa para construir system prompt
@@ -102,29 +114,50 @@ export async function chat(phone, userMessage, options = {}) {
 
   const systemPrompt = getSystemPrompt(companyData);
 
-  // Loop de tool use (máximo MAX_TOOL_ITERATIONS)
-  let response;
-  let workingMessages = [...session.messages];
+  // Mapear ferramentas do formato Anthropic para o formato OpenAI
+  let openaiTools = null;
+  if (tools && tools.length > 0) {
+    openaiTools = tools.map(t => ({
+      type: 'function',
+      function: {
+        name: t.name,
+        description: t.description,
+        parameters: t.input_schema
+      }
+    }));
+  }
+
+  // Montar mensagens de trabalho para a chamada da API
+  // OpenAI precisa das mensagens no formato padrão: { role, content, name, tool_calls, tool_call_id }
+  let workingMessages = [
+    { role: 'system', content: systemPrompt },
+    ...session.messages
+  ];
+
+  let responseMessage;
   let iterations = 0;
 
   while (iterations < MAX_TOOL_ITERATIONS) {
     iterations++;
 
-    const requestOptions = {
-      model: MODEL,
-      system: systemPrompt,
-      messages: workingMessages,
-      max_tokens: MAX_TOKENS
-    };
-
-    if (tools && tools.length > 0) {
-      requestOptions.tools = tools;
-    }
-
     try {
-      response = await anthropic.messages.create(requestOptions);
+      const apiOptions = {
+        model: MODEL,
+        messages: workingMessages,
+        max_tokens: MAX_TOKENS
+      };
+
+      if (openaiTools && openaiTools.length > 0) {
+        apiOptions.tools = openaiTools;
+      }
+
+      const completion = await openai.chat.completions.create(apiOptions);
+      responseMessage = completion.choices[0].message;
+
+      // Adicionar resposta do assistente (que pode conter tool_calls) ao histórico temporário
+      workingMessages.push(responseMessage);
     } catch (err) {
-      logger.error('Erro na Claude API', { phone, error: err.message, status: err.status });
+      logger.error('Erro na OpenAI API', { phone, error: err.message });
 
       // Resposta de fallback em caso de erro
       const fallback = '😔 Tuve un problema técnico. Por favor intenta de nuevo en un momento.';
@@ -133,53 +166,45 @@ export async function chat(phone, userMessage, options = {}) {
       return fallback;
     }
 
-    // Resposta final (sem tool use)
-    if (response.stop_reason !== 'tool_use' || !tools || !executeTool) {
+    // Se não houver tool_calls, a resposta final foi obtida
+    if (!responseMessage.tool_calls || responseMessage.tool_calls.length === 0 || !executeTool) {
       break;
     }
 
-    // Processar tool calls
-    const toolUseBlocks = response.content.filter(b => b.type === 'tool_use');
+    // Processar chamadas de ferramentas
+    logger.info(`Tool use (OpenAI): ${responseMessage.tool_calls.map(tc => tc.function.name).join(', ')}`, { phone, iteration: iterations });
 
-    logger.info(`Tool use: ${toolUseBlocks.map(b => b.name).join(', ')}`, { phone, iteration: iterations });
+    for (const toolCall of responseMessage.tool_calls) {
+      const toolName = toolCall.function.name;
+      let toolInput = {};
+      try {
+        toolInput = JSON.parse(toolCall.function.arguments);
+      } catch (jsonErr) {
+        logger.error(`Falha ao fazer parse dos argumentos da tool ${toolName}`, { arguments: toolCall.function.arguments });
+      }
 
-    const toolResults = await Promise.all(
-      toolUseBlocks.map(async (block) => {
-        try {
-          const result = await executeTool(block.name, block.input);
-          return {
-            type: 'tool_result',
-            tool_use_id: block.id,
-            content: JSON.stringify(result)
-          };
-        } catch (err) {
-          logger.error(`Erro ao executar tool ${block.name}`, { error: err.message });
-          return {
-            type: 'tool_result',
-            tool_use_id: block.id,
-            content: JSON.stringify({ erro: err.message }),
-            is_error: true
-          };
-        }
-      })
-    );
+      let toolResult;
+      try {
+        toolResult = await executeTool(toolName, toolInput, phone);
+      } catch (err) {
+        logger.error(`Erro ao executar tool ${toolName}`, { error: err.message });
+        toolResult = { error: err.message };
+      }
 
-    // Atualizar histórico de trabalho para próxima iteração
-    workingMessages = [
-      ...workingMessages,
-      { role: 'assistant', content: response.content },
-      { role: 'user', content: toolResults }
-    ];
+      // Adicionar a resposta da ferramenta no histórico temporário
+      workingMessages.push({
+        role: 'tool',
+        tool_call_id: toolCall.id,
+        name: toolName,
+        content: JSON.stringify(toolResult)
+      });
+    }
   }
 
-  // Extrair texto da resposta final
-  const assistantText = response.content
-    .filter(b => b.type === 'text')
-    .map(b => b.text)
-    .join('')
-    .trim();
+  // Obter texto final da resposta
+  const assistantText = (responseMessage.content || '').trim();
 
-  // Salvar no histórico persistente (somente exchange simplificado)
+  // Salvar no histórico de conversa persistente do usuário (formato texto simples)
   session.messages.push({ role: 'assistant', content: assistantText });
   trimHistory(session);
 
