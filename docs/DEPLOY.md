@@ -131,3 +131,147 @@ rm -rf .wwebjs_auth/
 node src/index.js       # Escanear QR Code novamente
 pm2 start ecosystem.config.js
 ```
+
+---
+
+## Deploy Automatizado com `deploy.sh` (Phase 5)
+
+Após a primeira configuração manual, use o script para deploys futuros:
+
+```bash
+# Na primeira vez, tornar o script executável:
+chmod +x deploy.sh
+
+# Para fazer deploy (a partir da raiz do projeto):
+./deploy.sh
+```
+
+O script executa automaticamente:
+1. ⏹ Para o bot (`pm2 stop aria-bot`)
+2. 💾 Backup da sessão WhatsApp em `.wwebjs_auth.bkp/`
+3. 📥 Atualiza o código (`git pull origin main`)
+4. 📦 Instala dependências (`npm install --production`)
+5. ▶ Reinicia o bot com novas configurações (`pm2 start ecosystem.config.js --update-env`)
+
+---
+
+## Monitoramento de Saúde — Health Check (Phase 5)
+
+O bot expõe um endpoint HTTP na porta 8080 para monitoramento externo.
+
+### Configurar as variáveis de ambiente em `.env`:
+
+```bash
+HEALTH_PORT=8080
+HEALTH_TOKEN=seu-token-secreto-aqui   # Gere um UUID ou string aleatória segura
+ADMIN_PHONE=5959812345678              # Número admin (código país + número, sem @c.us)
+```
+
+### Testar o endpoint de saúde:
+
+```bash
+# Com token no header Authorization:
+curl -H "Authorization: Bearer seu-token-secreto-aqui" http://localhost:8080/health
+
+# Com token como query param:
+curl "http://localhost:8080/health?token=seu-token-secreto-aqui"
+
+# De fora do servidor (substituir <IP_VPS> pelo IP real):
+curl -H "Authorization: Bearer seu-token-secreto-aqui" http://<IP_VPS>:8080/health
+```
+
+### Resposta esperada:
+
+```json
+{
+  "status": "ok",
+  "uptime": 3600,
+  "activeSessions": 2,
+  "waConnected": true,
+  "timestamp": "2025-05-22T20:00:00.000Z"
+}
+```
+
+| Campo | Significado |
+|-------|-------------|
+| `status: "ok"` | Bot conectado e funcionando normalmente |
+| `status: "degraded"` | WhatsApp desconectado — bot rodando mas tentando reconectar |
+| `uptime` | Segundos desde o início do processo |
+| `activeSessions` | Número de conversas ativas no Claude |
+| `waConnected` | `true` se WhatsApp está conectado |
+
+### Abrir a porta no firewall da VPS (se necessário):
+
+```bash
+sudo ufw allow 8080/tcp
+sudo ufw status
+```
+
+---
+
+## Rotação de Logs com `logrotate` (Phase 5)
+
+### Criar o arquivo de configuração do logrotate:
+
+```bash
+# Substitua 'usuario' e o caminho pelo usuário e diretório reais do seu servidor
+sudo nano /etc/logrotate.d/aria-bot
+```
+
+Cole o seguinte conteúdo (ajuste o caminho e o usuário):
+
+```
+/home/usuario/auto-zap/logs/*.log {
+    weekly
+    rotate 4
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 644 usuario usuario
+    postrotate
+        pm2 flush aria-bot
+    endscript
+}
+```
+
+### Testar a configuração:
+
+```bash
+# Dry run (mostra o que faria sem alterar arquivos):
+sudo logrotate -d /etc/logrotate.d/aria-bot
+
+# Forçar rotação agora (para testar de verdade):
+sudo logrotate -f /etc/logrotate.d/aria-bot
+```
+
+A configuração acima:
+- Roda **semanalmente**
+- Mantém **4 semanas** de histórico
+- **Comprime** logs antigos (`gzip`)
+- Limpa os buffers internos do PM2 após rotação (`pm2 flush aria-bot`)
+
+---
+
+## Notificações Admin via WhatsApp (Phase 5)
+
+Com `ADMIN_PHONE` configurado no `.env`, o bot enviará mensagens automáticas para o número admin quando:
+
+| Evento | Mensagem enviada |
+|--------|-----------------|
+| Bot desconecta | ⚠️ ARIA bot desconectado. Motivo: [reason]. Tentando reconectar... |
+| Estado UNPAIRED | ⚠️ ARIA: sessão WhatsApp UNPAIRED (expirada/banida). Tentando reconectar... |
+| Estado CONFLICT | ⚠️ ARIA: conflito WhatsApp (aberto em outro dispositivo). Reconectando... |
+| Estado TIMEOUT | ❌ ARIA: timeout do Puppeteer/Chrome. PM2 reiniciando o processo... |
+| Reconexão falhou (3x) | ❌ ARIA bot não conseguiu reconectar após 3 tentativas. PM2 reiniciando... |
+| Reconexão bem-sucedida | ✅ ARIA bot reconectado com sucesso! |
+
+### Formato do ADMIN_PHONE:
+
+```bash
+# Paraguai (595) + número (sem espaços, sem @c.us):
+ADMIN_PHONE=5959812345678
+
+# Brasil (55) + DDD + número:
+ADMIN_PHONE=5511987654321
+```

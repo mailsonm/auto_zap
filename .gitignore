@@ -6,6 +6,7 @@ node_modules/
 
 # Sessão WhatsApp (contém dados sensíveis de autenticação)
 .wwebjs_auth/
+.wwebjs_auth.bkp/
 .wwebjs_cache/
 
 # Logs

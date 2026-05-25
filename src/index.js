@@ -65,6 +65,50 @@ const client = new Client({
 const RECONNECT_DELAYS = [5000, 15000, 30000]; // 5s, 15s, 30s (backoff exponencial)
 let reconnectAttempts = 0;
 
+/**
+ * Enviar mensagem de alerta para o número admin configurado em ADMIN_PHONE.
+ * Falha silenciosamente se ADMIN_PHONE não estiver configurado.
+ */
+async function notifyAdmin(message) {
+  const adminPhone = process.env.ADMIN_PHONE;
+  if (!adminPhone) return;
+  try {
+    await client.sendMessage(`${adminPhone}@c.us`, message);
+    logger.info('Notificação enviada ao admin', { adminPhone });
+  } catch (err) {
+    logger.warn('Falha ao notificar admin via WhatsApp', { error: err.message });
+  }
+}
+
+/**
+ * Reconectar com backoff exponencial (máximo 3 tentativas).
+ * Após esgotar tentativas, encerra o processo (PM2 reinicia automaticamente).
+ */
+async function reconnectWithBackoff(reason = 'desconexão') {
+  if (reconnectAttempts >= RECONNECT_DELAYS.length) {
+    logger.error('Máximo de tentativas de reconexão atingido — encerrando para PM2 reiniciar.');
+    await notifyAdmin(`❌ ARIA bot não conseguiu reconectar após 3 tentativas (${reason}). PM2 reiniciando...`);
+    process.exit(1);
+  }
+
+  const delayMs = RECONNECT_DELAYS[reconnectAttempts];
+  reconnectAttempts++;
+
+  logger.warn(`Tentativa de reconexão ${reconnectAttempts}/3 em ${delayMs / 1000}s...`, { reason });
+
+  await new Promise(resolve => setTimeout(resolve, delayMs));
+
+  try {
+    await client.initialize();
+    reconnectAttempts = 0; // Reset após sucesso
+    logger.info('Reconexão bem-sucedida!');
+    await notifyAdmin('✅ ARIA bot reconectado com sucesso!');
+  } catch (err) {
+    logger.error(`Falha na reconexão (tentativa ${reconnectAttempts})`, { error: err.message });
+    await reconnectWithBackoff(reason);
+  }
+}
+
 // ─── Eventos do Cliente ───────────────────────────────────────────────────────
 
 client.on('qr', (qr) => {
@@ -91,16 +135,54 @@ client.on('ready', async () => {
 
 client.on('disconnected', async (reason) => {
   logger.warn('⚠️  WhatsApp desconectado', { reason });
-  logger.info('Tentando reconectar em 5 segundos...');
-
-  setTimeout(async () => {
-    try {
-      await client.initialize();
-    } catch (err) {
-      logger.error('Falha na reconexão', { error: err.message });
-    }
-  }, 5000);
+  setWAConnected(false);
+  await notifyAdmin(`⚠️ ARIA bot desconectado. Motivo: ${reason}. Tentando reconectar...`);
+  await reconnectWithBackoff(reason);
 });
+
+// Monitorar estados críticos do WhatsApp (Phase 5: D-06)
+client.on('change_state', async (state) => {
+  logger.info('Estado WhatsApp alterado', { state });
+
+  switch (state) {
+    case 'UNPAIRED':
+      // Sessão expirada ou banida — tentar reconectar
+      logger.warn('Estado UNPAIRED: sessão expirada ou banida');
+      setWAConnected(false);
+      await notifyAdmin('⚠️ ARIA: sessão WhatsApp UNPAIRED (expirada/banida). Tentando reconectar...');
+      await reconnectWithBackoff('UNPAIRED');
+      break;
+
+    case 'CONFLICT':
+      // WhatsApp Web aberto em outro dispositivo — forçar reconexão
+      logger.warn('Estado CONFLICT: WhatsApp aberto em outro dispositivo');
+      setWAConnected(false);
+      await notifyAdmin('⚠️ ARIA: conflito WhatsApp (aberto em outro dispositivo). Reconectando...');
+      // Pequena pausa para o outro dispositivo ter chance de fechar
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      await reconnectWithBackoff('CONFLICT');
+      break;
+
+    case 'TIMEOUT':
+      // Puppeteer/Chrome travado — encerrar (PM2 reinicia o processo)
+      logger.error('Estado TIMEOUT: Puppeteer/Chrome travado — encerrando para PM2 reiniciar');
+      setWAConnected(false);
+      await notifyAdmin('❌ ARIA: timeout do Puppeteer/Chrome. PM2 reiniciando o processo...');
+      process.exit(1);
+      break;
+
+    case 'CONNECTED':
+      // Reconectado com sucesso
+      logger.info('Estado CONNECTED: WhatsApp reconectado com sucesso');
+      setWAConnected(true);
+      reconnectAttempts = 0;
+      break;
+
+    default:
+      logger.debug(`Estado WhatsApp: ${state}`);
+  }
+});
+
 
 // ─── Handler de Mensagens ─────────────────────────────────────────────────────
 
