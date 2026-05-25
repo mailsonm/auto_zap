@@ -175,6 +175,40 @@ export function appendHistory(history) {
   });
 }
 
+/** Registrar status do bot para controle de atendimento */
+export function updateBotStatusInSheets(phone, status) {
+  return postSheet('controle', {
+    action: 'append',
+    data: {
+      telefone: phone,
+      status: status,
+      data_hora: new Date().toISOString()
+    }
+  }).catch(err => {
+    logger.error('Erro ao atualizar status do bot no Sheets', { phone, status, error: err.message });
+  });
+}
+
+/** Buscar status atual de controle do bot para um contato no Sheets */
+export async function fetchBotControlStatus(phone) {
+  try {
+    // Ler a aba controle com cache curto de 10 segundos
+    const rows = await getSheet('controle', 10_000);
+    const userRows = rows.filter(r => {
+      const rowPhone = String(r.telefone || '').replace(/\D/g, '');
+      const searchPhone = String(phone || '').replace(/\D/g, '');
+      return rowPhone === searchPhone;
+    });
+
+    if (userRows.length === 0) return null;
+    // Retornar o status da última linha registrada para o telefone
+    return userRows[userRows.length - 1].status;
+  } catch (err) {
+    logger.warn('Falha ao obter status de controle do bot do Sheets', { phone, error: err.message });
+    return null;
+  }
+}
+
 /** Invalidar cache de uma aba (força refetch na próxima chamada) */
 export function invalidateCache(sheetName) {
   cache.delete(sheetName);

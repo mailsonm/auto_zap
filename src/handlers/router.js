@@ -20,7 +20,7 @@ import {
   addTopic,
   closeSession
 } from '../session.js';
-import { appendHistory } from '../sheets.js';
+import { appendHistory, fetchBotControlStatus, updateBotStatusInSheets } from '../sheets.js';
 
 // Padrões de pedido de atendimento humano (multilíngue)
 const HUMAN_REQUEST_PATTERNS = [
@@ -77,6 +77,24 @@ export async function handleMessage(msg, toolOptions = {}) {
     return getRateLimitMessage(retryAfterMs, lang, inCooldown);
   }
 
+  // ── Sincronização de Controle com o Sheets ──────────────────────────────────
+  try {
+    const sheetsStatus = await fetchBotControlStatus(phone);
+    if (sheetsStatus === 'Ativo') {
+      if (isHumanTakeover(phone)) {
+        logger.info('Reativando bot via painel Google Sheets (Ativo)', { phone });
+        setHumanTakeover(phone, false);
+      }
+    } else if (sheetsStatus === 'Inativo') {
+      if (!isHumanTakeover(phone)) {
+        logger.info('Pausando bot indefinidamente via painel Google Sheets (Inativo)', { phone });
+        setHumanTakeover(phone, true, true);
+      }
+    }
+  } catch (err) {
+    logger.warn('Erro ao sincronizar status de controle com Sheets', { phone, error: err.message });
+  }
+
   // ── Human Takeover Ativo ───────────────────────────────────────────────────
   if (isHumanTakeover(phone)) {
     logger.info('Mensagem ignorada — human takeover ativo', { phone });
@@ -96,6 +114,7 @@ export async function handleMessage(msg, toolOptions = {}) {
   // ── Pedido de Atendimento Humano ───────────────────────────────────────────
   if (isHumanRequest(text)) {
     setHumanTakeover(phone, true);
+    updateBotStatusInSheets(phone, 'Pausado (Humano)');
     addTopic(phone, 'human_request');
 
     // Salvar histórico antes de sair

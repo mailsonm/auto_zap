@@ -11,11 +11,12 @@ const { Client, LocalAuth } = whatsappWeb;
 import qrcode from 'qrcode-terminal';
 import logger from './logger.js';
 import { handleMessage } from './handlers/router.js';
-import { getProducts, getFAQs, getBranches, getServices, onCacheRefresh } from './sheets.js';
+import { getProducts, getFAQs, getBranches, getServices, onCacheRefresh, updateBotStatusInSheets } from './sheets.js';
 import { buildProductIndex, buildFAQIndex, buildBranchIndex, buildServiceIndex } from './tools/search.js';
 import { SAMANTHA_TOOLS, executeTool } from './tools/index.js';
 import { startHealthServer, setWAConnected } from './health.js';
 import { sendWithDelay } from './middleware/messageQueue.js';
+import { setHumanTakeover } from './session.js';
 
 // Registrar atualizadores automáticos de índice de busca fuzzy
 onCacheRefresh('productos', (data) => buildProductIndex(data));
@@ -210,6 +211,22 @@ client.on('message', async (msg) => {
     } catch (_) {
       // Se não conseguir enviar, apenas logar
     }
+  }
+});
+
+// Intercepta mensagens criadas pelo próprio atendente humano
+client.on('message_create', async (msg) => {
+  try {
+    if (msg.fromMe) {
+      const phone = msg.to;
+      if (phone && !phone.includes('@g.us')) {
+        logger.info('Detecção de intervenção humana (mensagem manual enviada)', { to: phone });
+        setHumanTakeover(phone, true);
+        updateBotStatusInSheets(phone, 'Pausado (Humano)');
+      }
+    }
+  } catch (err) {
+    logger.error('Erro no interceptador message_create', { error: err.message });
   }
 });
 

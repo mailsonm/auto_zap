@@ -1,6 +1,7 @@
 import { jest } from '@jest/globals';
 
-// ─── Registrar Mocks ESM ──────────────────────────────────────────────────────
+// Variável de controle dinâmico de status do Sheets
+let mockSheetsStatus = null;
 
 // Mock da OpenAI
 jest.unstable_mockModule('openai', () => {
@@ -107,6 +108,8 @@ jest.unstable_mockModule('../../src/sheets.js', () => {
     getServices: async () => [],
     appendLead: async () => ({ sucesso: true }),
     appendHistory: async () => ({ sucesso: true }),
+    updateBotStatusInSheets: async () => ({ sucesso: true }),
+    fetchBotControlStatus: async () => mockSheetsStatus,
     onCacheRefresh: () => {}
   };
 });
@@ -115,10 +118,12 @@ jest.unstable_mockModule('../../src/sheets.js', () => {
 
 const { handleMessage } = await import('../../src/handlers/router.js');
 const { SAMANTHA_TOOLS, executeTool } = await import('../../src/tools/index.js');
+const { setHumanTakeover, isHumanTakeover } = await import('../../src/session.js');
 
 describe('Testes de Integração de Handlers — Samantha (OpenAI)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSheetsStatus = null;
   });
 
   test('Deve responder mensagem de saudação padrão da Samantha', async () => {
@@ -162,5 +167,51 @@ describe('Testes de Integração de Handlers — Samantha (OpenAI)', () => {
     const response = await handleMessage(msg, { tools: SAMANTHA_TOOLS, executeTool });
     expect(response).toBeDefined();
     expect(typeof response).toBe('string');
+  });
+
+  test('Deve ignorar mensagens e ativar takeover se controle do Sheets estiver Inativo', async () => {
+    const phone = '595981234567@c.us';
+    const msg = {
+      from: phone,
+      body: 'hola',
+      isGroupMsg: false,
+      reply: jest.fn()
+    };
+
+    // Forçar controle do Sheets para Inativo
+    mockSheetsStatus = 'Inativo';
+
+    const response = await handleMessage(msg, { tools: SAMANTHA_TOOLS, executeTool });
+    
+    // O bot deve ignorar a mensagem (retornar null)
+    expect(response).toBeNull();
+    
+    // E o takeover local deve ter sido ativado na sessão
+    expect(isHumanTakeover(phone)).toBe(true);
+  });
+
+  test('Deve limpar takeover local se controle do Sheets mudar para Ativo', async () => {
+    const phone = '595981234567@c.us';
+    const msg = {
+      from: phone,
+      body: 'hola',
+      isGroupMsg: false,
+      reply: jest.fn()
+    };
+
+    // Ativar o takeover localmente de forma prévia
+    setHumanTakeover(phone, true);
+    expect(isHumanTakeover(phone)).toBe(true);
+
+    // Mudar controle no Sheets para Ativo
+    mockSheetsStatus = 'Ativo';
+
+    const response = await handleMessage(msg, { tools: SAMANTHA_TOOLS, executeTool });
+    
+    // O bot deve responder normalmente (não null)
+    expect(response).toBe('Hola, soy Samantha. ¿En qué puedo ayudarte hoy?');
+    
+    // E o takeover local deve ter sido removido
+    expect(isHumanTakeover(phone)).toBe(false);
   });
 });

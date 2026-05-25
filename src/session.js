@@ -32,6 +32,7 @@ export function getSession(phone) {
   if (!sessionMap.has(phone)) {
     sessionMap.set(phone, {
       humanTakeover: false,
+      takeoverTime: null,
       language: 'es',
       startedAt: Date.now(),
       lastMessageAt: Date.now(),
@@ -48,17 +49,36 @@ export function getSession(phone) {
  * @returns {boolean}
  */
 export function isHumanTakeover(phone) {
-  return sessionMap.get(phone)?.humanTakeover === true;
+  const session = sessionMap.get(phone);
+  if (!session) return false;
+
+  if (session.humanTakeover) {
+    if (session.takeoverTime) {
+      const cooldownMin = parseInt(process.env.HUMAN_TAKEOVER_COOLDOWN_MIN) || 30;
+      const cooldownMs = cooldownMin * 60 * 1000;
+      if (Date.now() - session.takeoverTime > cooldownMs) {
+        session.humanTakeover = false;
+        session.takeoverTime = null;
+        logger.info('Takeover humano expirou por tempo. Bot reativado.', { phone });
+        return false;
+      }
+    }
+    return true;
+  }
+  return false;
 }
 
 /**
  * Marcar conversa como assumida por humano.
  * @param {string} phone
+ * @param {boolean} active
+ * @param {boolean} indefinite
  */
-export function setHumanTakeover(phone, active = true) {
+export function setHumanTakeover(phone, active = true, indefinite = false) {
   const session = getSession(phone);
   session.humanTakeover = active;
-  logger.info(`Human takeover: ${active ? 'ativado' : 'desativado'}`, { phone });
+  session.takeoverTime = active ? (indefinite ? null : Date.now()) : null;
+  logger.info(`Human takeover: ${active ? 'ativado' : 'desativado'} (indefinido: ${indefinite})`, { phone });
 }
 
 /**
