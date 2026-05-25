@@ -9,27 +9,26 @@ See: .planning/PROJECT.md (updated 2026-05-21)
 
 ## Current Status
 
-**Phase:** 1 ✅ COMPLETA — Fundação implementada e commitada
+**Phase:** 6 ⏳ INICIADA — Testes, Otimização & Documentação Final (Alinhamento de Contexto concluído)
 **Mode:** YOLO
-**Last action:** Phase 1 executada — 15 arquivos criados, 0 erros de sintaxe
+**Last action:** Finalizada a Fase 5 (Robustez & Deploy) e criados os arquivos de contexto da Fase 6
 
 ## Phase Progress
 
 | Phase | Name | Status |
 |-------|------|--------|
 | 1 | Fundação — OpenWA + Claude + Google Sheets | ✅ Completa |
-| 2 | Catálogo Inteligente & FAQ | ⏳ Not started |
-| 3 | Filiais, Serviços & Contexto Local | ⏳ Not started |
-| 4 | Registro de Leads & Histórico | ⏳ Not started |
-| 5 | Robustez, Rate Limiting & Deploy VPS | ⏳ Not started |
-| 6 | Testes, Otimização & Documentação Final | ⏳ Not started |
+| 2 | Catálogo Inteligente & FAQ | ✅ Completa |
+| 3 | Filiais, Serviços & Contexto Local | ✅ Completa |
+| 4 | Registro de Leads & Histórico | ✅ Completa |
+| 5 | Robustez, Rate Limiting & Deploy VPS | ✅ Completa |
+| 6 | Testes, Otimização & Documentação Final | ⏳ Em andamento |
 
 ## Context for Next Session
 
-- Phase 1 completa — próximo: `/gsd-execute-phase 2`
-- Antes de rodar: copiar `.env.example` → `.env` e preencher `ANTHROPIC_API_KEY` e `GOOGLE_SHEETS_SCRIPT_URL`
-- Para testar: `npm start` (exibe QR Code no terminal)
-- Google Sheets App Script URL: `https://script.google.com/macros/s/AKfycbxsyIkg8pdFutoCO6KlXqCPFM-LqSPwtn4EpG6yX63k02Ui5qi4E_b_wL_oWIjedLoS/exec`
-- OpenWA reference: `https://github.com/rmyndharis/OpenWA`
-- Claude API key: available in developer's env
-- Hosting: Local dev → Hostinger VPS (PM2 + Node.js)
+- Phase 5 completa (Rate limits, mensagem humanizada, backoff, /health check e deploy documentado).
+- Phase 6 alinhada (Decidido Jest 100% mockado, takeover híbrido no whatsapp + sheets e contratos de interface ERP).
+- Leads são criados com protocolo exclusivo de 6 dígitos prefixados na coluna notas.
+- Timeout (inatividade) e takeover limpam memória no Claude e consolidam histórico de conversas no Sheets.
+- O smoke test da Fase 4 passou com sucesso offline (`node scratch/smoke_phase4.js`).
+
