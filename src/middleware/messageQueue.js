@@ -56,6 +56,6 @@ export async function sendWithDelay(msg, response) {
   logger.debug(`Aguardando ${delayMs}ms antes de responder (delay humanizado)`, { from: msg.from });
   await sleep(delayMs);
 
-  // Enviar resposta
-  await msg.reply(response);
+  // Envia a resposta com o caractere invisível \u200B no final para identificação do bot
+  await msg.reply(response + '\u200B');
 }

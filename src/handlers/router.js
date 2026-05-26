@@ -92,30 +92,36 @@ export async function handleMessage(msg, toolOptions = {}) {
   }
 
   // ── Sincronização de Controle com o Sheets ──────────────────────────────────
-  try {
-    const sheetsStatus = await fetchBotControlStatus(phone);
-    const isAtivo = (sheetsStatus === 'Ativo' || sheetsStatus === false || sheetsStatus === 'false');
-    const isPausado = (sheetsStatus === 'Pausado (Humano)' || sheetsStatus === 'Inativo' || sheetsStatus === true || sheetsStatus === 'true');
+  const isRecentLocalChange = session && (Date.now() - (session.lastLocalChange || 0) < 30000);
+  if (!isRecentLocalChange) {
+    try {
+      const sheetsStatus = await fetchBotControlStatus(phone);
+      const isAtivo = (sheetsStatus === 'Ativo' || sheetsStatus === false || sheetsStatus === 'false');
+      const isPausado = (sheetsStatus === 'Pausado (Humano)' || sheetsStatus === 'Inativo' || sheetsStatus === true || sheetsStatus === 'true');
 
-    if (isAtivo) {
-      if (isHumanTakeover(phone)) {
-        logger.info('Reativando bot via painel Google Sheets (Ativo)', { phone });
-        setHumanTakeover(phone, false);
+      if (isAtivo) {
+        if (isHumanTakeover(phone)) {
+          logger.info('Reativando bot via painel Google Sheets (Ativo)', { phone });
+          setHumanTakeover(phone, false);
+        }
+      } else if (isPausado) {
+        const isIndefinite = (sheetsStatus === 'Inativo');
+        if (!isHumanTakeover(phone)) {
+          logger.info('Pausando bot via painel Google Sheets', { phone, indefinite: isIndefinite });
+          setHumanTakeover(phone, true, isIndefinite);
+        }
       }
-    } else if (isPausado) {
-      const isIndefinite = (sheetsStatus === 'Inativo');
-      if (!isHumanTakeover(phone)) {
-        logger.info('Pausando bot via painel Google Sheets', { phone, indefinite: isIndefinite });
-        setHumanTakeover(phone, true, isIndefinite);
-      }
+    } catch (err) {
+      logger.warn('Erro ao sincronizar status de controle com Sheets', { phone, error: err.message });
     }
-  } catch (err) {
-    logger.warn('Erro ao sincronizar status de controle com Sheets', { phone, error: err.message });
+  } else {
+    logger.debug('Sincronização com Sheets ignorada por alteração local recente', { phone });
   }
 
   // ── Solicitação de Retorno ao Bot (Cliente quer voltar para a Samantha) ────
   if (isHumanTakeover(phone) && isBotRequest(text)) {
     logger.info('Cliente solicitou retorno ao bot. Desativando takeover.', { phone });
+    session.lastLocalChange = Date.now();
     setHumanTakeover(phone, false);
     updateBotStatusInSheets(phone, 'Ativo');
   }
@@ -138,6 +144,7 @@ export async function handleMessage(msg, toolOptions = {}) {
 
   // ── Pedido de Atendimento Humano ───────────────────────────────────────────
   if (isHumanRequest(text) && !isBotRequest(text)) {
+    session.lastLocalChange = Date.now();
     setHumanTakeover(phone, true);
     updateBotStatusInSheets(phone, 'Pausado (Humano)');
     addTopic(phone, 'human_request');

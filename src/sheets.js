@@ -180,6 +180,9 @@ export function updateBotStatusInSheets(phone, status) {
   // Se for 'Pausado (Humano)' ou 'Inativo', gravamos true (marcado). Se for 'Ativo', gravamos false (desmarcado).
   const isPausado = (status === 'Pausado (Humano)' || status === 'Inativo');
 
+  // Invalida cache local imediatamente para que leituras paralelas não vejam dados defasados
+  invalidateCache('controle');
+
   return postSheet('controle', {
     action: 'append',
     data: {
@@ -187,6 +190,10 @@ export function updateBotStatusInSheets(phone, status) {
       status: isPausado, // true marca o checkbox, false desmarca
       data_hora: new Date().toISOString()
     }
+  }).then(res => {
+    // Invalida novamente pós-sucesso para garantir dados frescos
+    invalidateCache('controle');
+    return res;
   }).catch(err => {
     logger.error('Erro ao atualizar status do bot no Sheets', { phone, status, error: err.message });
   });

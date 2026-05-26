@@ -5,13 +5,13 @@
 See: .planning/PROJECT.md (updated 2026-05-21)
 
 **Core value:** Todo cliente que manda mensagem recebe uma resposta útil em segundos — seja consulta de produto, FAQ ou encaminhamento para humano.
-**Current focus:** Phase 1 — Fundação (OpenWA + Claude + Google Sheets)
+**Current focus:** Finalizado! Preparando para o próximo ciclo de desenvolvimento (Integração ERP / Próxima Versão).
 
 ## Current Status
 
-**Phase:** 6 ⏳ INICIADA — Testes, Otimização & Documentação Final (Alinhamento de Contexto concluído)
+**Phase:** 6 ✅ COMPLETA — Testes, Otimização & Documentação Final
 **Mode:** YOLO
-**Last action:** Finalizada a Fase 5 (Robustez & Deploy) e criados os arquivos de contexto da Fase 6
+**Last action:** Correções finais de concorrência no takeover (zero-width space) e injeção dinâmica de idioma para o OpenAI.
 
 ## Phase Progress
 
@@ -22,13 +22,12 @@ See: .planning/PROJECT.md (updated 2026-05-21)
 | 3 | Filiais, Serviços & Contexto Local | ✅ Completa |
 | 4 | Registro de Leads & Histórico | ✅ Completa |
 | 5 | Robustez, Rate Limiting & Deploy VPS | ✅ Completa |
-| 6 | Testes, Otimização & Documentação Final | ⏳ Em andamento |
+| 6 | Testes, Otimização & Documentação Final | ✅ Completa |
 
 ## Context for Next Session
 
-- Phase 5 completa (Rate limits, mensagem humanizada, backoff, /health check e deploy documentado).
-- Phase 6 alinhada (Decidido Jest 100% mockado, takeover híbrido no whatsapp + sheets e contratos de interface ERP).
-- Leads são criados com protocolo exclusivo de 6 dígitos prefixados na coluna notas.
-- Timeout (inatividade) e takeover limpam memória no Claude e consolidam histórico de conversas no Sheets.
-- O smoke test da Fase 4 passou com sucesso offline (`node scratch/smoke_phase4.js`).
+- Phase 6 concluída com testes Jest cobrindo handlers de mensagens.
+- Resolvido bug de auto-takeover usando caractere invisível zero-width space (\u200B) nas mensagens da Samantha.
+- Ajustada injeção dinâmica de idioma no OpenAI + definição inteligente baseada em DDI de telefone.
+- Documentações de operação (OPERATIONS.md) e integração futura com ERP/Odoo (ERP-INTEGRATION.md) criadas.
 

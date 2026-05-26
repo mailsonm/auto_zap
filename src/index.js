@@ -212,7 +212,7 @@ client.on('message', async (msg) => {
 
     // Tentar enviar mensagem de erro ao cliente
     try {
-      await msg.reply('😔 Ocurrió un error. Por favor intenta de nuevo en un momento.');
+      await msg.reply('😔 Ocurrió un error. Por favor intenta de nuevo en un momento.\u200B');
     } catch (_) {
       // Se não conseguir enviar, apenas logar
     }
@@ -228,7 +228,18 @@ client.on('message_create', async (msg) => {
 
       const phone = msg.to;
       if (phone && !phone.includes('@g.us')) {
+        // Se a mensagem contém o caractere invisível \u200B, sabemos que foi enviada pelo bot
+        if (msg.body && msg.body.includes('\u200B')) {
+          logger.debug('Ignorando message_create pois foi enviada pelo próprio bot (caractere invisível detectado)', { to: phone });
+          return;
+        }
+
         logger.info('Detecção de intervenção humana (mensagem manual enviada)', { to: phone });
+        const { getSession } = await import('./session.js'); // Lazy import if needed, or import at top
+        const session = getSession(phone);
+        if (session) {
+          session.lastLocalChange = Date.now();
+        }
         setHumanTakeover(phone, true);
         updateBotStatusInSheets(phone, 'Pausado (Humano)');
       }

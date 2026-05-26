@@ -32,10 +32,18 @@ export const sessions = new Map();
  */
 function getSession(phone) {
   if (!sessions.has(phone)) {
+    const cleanPhone = phone.replace(/\D/g, '');
+    let defaultLang = 'es';
+    if (cleanPhone.startsWith('55')) {
+      defaultLang = 'pt';
+    } else if (cleanPhone.startsWith('1') || cleanPhone.startsWith('44')) {
+      defaultLang = 'en';
+    }
+
     sessions.set(phone, {
       messages: [],
       lastActivity: Date.now(),
-      language: 'es'
+      language: defaultLang
     });
   }
   return sessions.get(phone);
@@ -112,7 +120,12 @@ export async function chat(phone, userMessage, options = {}) {
     logger.warn('Não foi possível carregar dados da empresa', { error: err.message });
   }
 
-  const systemPrompt = getSystemPrompt(companyData);
+  let systemPrompt = getSystemPrompt(companyData);
+  if (session.language) {
+    const langNames = { es: 'español (Spanish)', pt: 'portugués (Portuguese)', en: 'inglés (English)' };
+    const targetLang = langNames[session.language] || 'español (Spanish)';
+    systemPrompt += `\n\n[IMPORTANT: The current client language is ${targetLang}. You MUST respond to the client's message in ${targetLang}.]`;
+  }
 
   // Mapear ferramentas do formato Anthropic para o formato OpenAI
   let openaiTools = null;

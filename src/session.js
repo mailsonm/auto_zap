@@ -30,10 +30,19 @@ const sessionMap = new Map();
  */
 export function getSession(phone) {
   if (!sessionMap.has(phone)) {
+    const cleanPhone = phone.replace(/\D/g, '');
+    let defaultLang = 'es';
+    if (cleanPhone.startsWith('55')) {
+      defaultLang = 'pt';
+    } else if (cleanPhone.startsWith('1') || cleanPhone.startsWith('44')) {
+      defaultLang = 'en';
+    }
+
     sessionMap.set(phone, {
       humanTakeover: false,
       takeoverTime: null,
-      language: 'es',
+      lastLocalChange: 0,
+      language: defaultLang,
       startedAt: Date.now(),
       lastMessageAt: Date.now(),
       turns: 0,
@@ -59,6 +68,7 @@ export function isHumanTakeover(phone) {
       if (Date.now() - session.takeoverTime > cooldownMs) {
         session.humanTakeover = false;
         session.takeoverTime = null;
+        session.lastLocalChange = Date.now();
         logger.info('Takeover humano expirou por tempo. Bot reativado.', { phone });
         return false;
       }
