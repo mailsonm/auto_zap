@@ -26,7 +26,7 @@ onCacheRefresh('serviços', (data) => buildServiceIndex(data));
 
 // ─── Validação de Ambiente ────────────────────────────────────────────────────
 
-const REQUIRED_ENV = ['ANTHROPIC_API_KEY', 'GOOGLE_SHEETS_SCRIPT_URL'];
+const REQUIRED_ENV = ['OPENAI_API_KEY', 'GOOGLE_SHEETS_SCRIPT_URL'];
 const missing = REQUIRED_ENV.filter(k => !process.env[k]);
 if (missing.length > 0) {
   logger.error(`Variáveis de ambiente faltando: ${missing.join(', ')}`);
@@ -40,7 +40,7 @@ startHealthServer();
 
 // ─── Cliente WhatsApp ─────────────────────────────────────────────────────────
 
-const WA_CLIENT_ID = process.env.WA_CLIENT_ID || 'aria-main';
+const WA_CLIENT_ID = process.env.WA_CLIENT_ID || 'samantha-main';
 
 const client = new Client({
   authStrategy: new LocalAuth({
