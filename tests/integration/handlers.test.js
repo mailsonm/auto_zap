@@ -214,4 +214,24 @@ describe('Testes de Integração de Handlers — Samantha (OpenAI)', () => {
     // E o takeover local deve ter sido removido
     expect(isHumanTakeover(phone)).toBe(false);
   });
+
+  test('Deve desativar takeover local e responder se o cliente pedir para voltar para a Samantha', async () => {
+    const phone = '595981234569@c.us';
+    const msg = {
+      from: phone,
+      body: 'quero falar com a samantha',
+      isGroupMsg: false,
+      reply: jest.fn()
+    };
+
+    // Ativar o takeover localmente de forma prévia (bot pausado)
+    setHumanTakeover(phone, true);
+    expect(isHumanTakeover(phone)).toBe(true);
+
+    const response = await handleMessage(msg, { tools: SAMANTHA_TOOLS, executeTool });
+    
+    // O bot deve sair do takeover e responder na hora
+    expect(response).toBe('Hola, soy Samantha. ¿En qué puedo ayudarte hoy?');
+    expect(isHumanTakeover(phone)).toBe(false);
+  });
 });

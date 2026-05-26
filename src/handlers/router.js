@@ -38,6 +38,20 @@ function isHumanRequest(text) {
   return HUMAN_REQUEST_PATTERNS.some(p => p.test(text));
 }
 
+// Padrões para o cliente solicitar retorno ao bot Samantha (multilíngue)
+const BOT_REQUEST_PATTERNS = [
+  // Espanhol
+  /\b(hablar con la asistente|hablar con el bot|volver al bot|volver al asistente|hablar con el robot|samantha)\b/i,
+  // Português
+  /\b(falar com a assistente|falar com o bot|voltar para o bot|voltar para a assistente|falar com o robô|samantha)\b/i,
+  // Inglês
+  /\b(speak to assistant|talk to bot|back to bot|speak to robot|samantha)\b/i
+];
+
+function isBotRequest(text) {
+  return BOT_REQUEST_PATTERNS.some(p => p.test(text));
+}
+
 // Mensagens de encaminhamento para humano (por idioma)
 const HANDOFF_MESSAGES = {
   es: '¡Entendido! 😊 Voy a avisar a uno de nuestros asesores para que te atienda. Por favor espera un momento.',
@@ -95,6 +109,13 @@ export async function handleMessage(msg, toolOptions = {}) {
     logger.warn('Erro ao sincronizar status de controle com Sheets', { phone, error: err.message });
   }
 
+  // ── Solicitação de Retorno ao Bot (Cliente quer voltar para a Samantha) ────
+  if (isHumanTakeover(phone) && isBotRequest(text)) {
+    logger.info('Cliente solicitou retorno ao bot. Desativando takeover.', { phone });
+    setHumanTakeover(phone, false);
+    updateBotStatusInSheets(phone, 'Ativo');
+  }
+
   // ── Human Takeover Ativo ───────────────────────────────────────────────────
   if (isHumanTakeover(phone)) {
     logger.info('Mensagem ignorada — human takeover ativo', { phone });
@@ -112,7 +133,7 @@ export async function handleMessage(msg, toolOptions = {}) {
   incrementTurn(phone);
 
   // ── Pedido de Atendimento Humano ───────────────────────────────────────────
-  if (isHumanRequest(text)) {
+  if (isHumanRequest(text) && !isBotRequest(text)) {
     setHumanTakeover(phone, true);
     updateBotStatusInSheets(phone, 'Pausado (Humano)');
     addTopic(phone, 'human_request');
