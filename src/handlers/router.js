@@ -94,15 +94,19 @@ export async function handleMessage(msg, toolOptions = {}) {
   // ── Sincronização de Controle com o Sheets ──────────────────────────────────
   try {
     const sheetsStatus = await fetchBotControlStatus(phone);
-    if (sheetsStatus === 'Ativo') {
+    const isAtivo = (sheetsStatus === 'Ativo' || sheetsStatus === false || sheetsStatus === 'false');
+    const isPausado = (sheetsStatus === 'Pausado (Humano)' || sheetsStatus === 'Inativo' || sheetsStatus === true || sheetsStatus === 'true');
+
+    if (isAtivo) {
       if (isHumanTakeover(phone)) {
         logger.info('Reativando bot via painel Google Sheets (Ativo)', { phone });
         setHumanTakeover(phone, false);
       }
-    } else if (sheetsStatus === 'Inativo') {
+    } else if (isPausado) {
+      const isIndefinite = (sheetsStatus === 'Inativo');
       if (!isHumanTakeover(phone)) {
-        logger.info('Pausando bot indefinidamente via painel Google Sheets (Inativo)', { phone });
-        setHumanTakeover(phone, true, true);
+        logger.info('Pausando bot via painel Google Sheets', { phone, indefinite: isIndefinite });
+        setHumanTakeover(phone, true, isIndefinite);
       }
     }
   } catch (err) {

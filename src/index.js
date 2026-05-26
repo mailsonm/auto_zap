@@ -18,6 +18,8 @@ import { startHealthServer, setWAConnected } from './health.js';
 import { sendWithDelay } from './middleware/messageQueue.js';
 import { setHumanTakeover } from './session.js';
 
+const STARTUP_TIME = Math.floor(Date.now() / 1000);
+
 // Registrar atualizadores automáticos de índice de busca fuzzy
 onCacheRefresh('productos', (data) => buildProductIndex(data));
 onCacheRefresh('faqs', (data) => buildFAQIndex(data));
@@ -189,6 +191,9 @@ client.on('change_state', async (state) => {
 
 client.on('message', async (msg) => {
   try {
+    // Ignorar mensagens da sincronização de startup
+    if (msg.timestamp < STARTUP_TIME) return;
+
     const response = await handleMessage(msg, { tools: SAMANTHA_TOOLS, executeTool });
 
     if (response) {
@@ -218,6 +223,9 @@ client.on('message', async (msg) => {
 client.on('message_create', async (msg) => {
   try {
     if (msg.fromMe) {
+      // Ignorar mensagens da sincronização de startup
+      if (msg.timestamp < STARTUP_TIME) return;
+
       const phone = msg.to;
       if (phone && !phone.includes('@g.us')) {
         logger.info('Detecção de intervenção humana (mensagem manual enviada)', { to: phone });

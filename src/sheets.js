@@ -177,11 +177,14 @@ export function appendHistory(history) {
 
 /** Registrar status do bot para controle de atendimento */
 export function updateBotStatusInSheets(phone, status) {
+  // Se for 'Pausado (Humano)' ou 'Inativo', gravamos true (marcado). Se for 'Ativo', gravamos false (desmarcado).
+  const isPausado = (status === 'Pausado (Humano)' || status === 'Inativo');
+
   return postSheet('controle', {
     action: 'append',
     data: {
       telefone: phone,
-      status: status,
+      status: isPausado, // true marca o checkbox, false desmarca
       data_hora: new Date().toISOString()
     }
   }).catch(err => {
