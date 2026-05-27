@@ -2,32 +2,27 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-21)
+See: .planning/PROJECT.md (updated 2026-05-27)
 
-**Core value:** Todo cliente que manda mensagem recebe uma resposta útil em segundos — seja consulta de produto, FAQ ou encaminhamento para humano.
-**Current focus:** Finalizado! Preparando para o próximo ciclo de desenvolvimento (Integração ERP / Próxima Versão).
+**Core value:** Todo cliente que manda mensagem recebe uma resposta útil em segundos — seja no WhatsApp ou no Instagram DMs.
+**Current focus:** Phase 7 — Webhook & Validação Meta (Integração Instagram DMs)
 
 ## Current Status
 
-**Phase:** 6 ✅ COMPLETA — Testes, Otimização & Documentação Final
+**Phase:** 7 ⏳ INICIADA — Webhook & Validação Meta (Milestone 2 inicializado)
 **Mode:** YOLO
-**Last action:** Correções finais de concorrência no takeover (zero-width space) e injeção dinâmica de idioma para o OpenAI.
+**Last action:** Inicializado o Milestone 2 (v2.0), configurados os requisitos e roadmap das fases 7, 8 e 9.
 
 ## Phase Progress
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | Fundação — OpenWA + Claude + Google Sheets | ✅ Completa |
-| 2 | Catálogo Inteligente & FAQ | ✅ Completa |
-| 3 | Filiais, Serviços & Contexto Local | ✅ Completa |
-| 4 | Registro de Leads & Histórico | ✅ Completa |
-| 5 | Robustez, Rate Limiting & Deploy VPS | ✅ Completa |
-| 6 | Testes, Otimização & Documentação Final | ✅ Completa |
+| 7 | Webhook & Validação Meta | ⏳ Pendente |
+| 8 | Resposta & Envio Graph API | ⏳ Pendente |
+| 9 | Sessão & Roteamento Unificado | ⏳ Pendente |
 
 ## Context for Next Session
 
-- Phase 6 concluída com testes Jest cobrindo handlers de mensagens.
-- Resolvido bug de auto-takeover usando caractere invisível zero-width space (\u200B) nas mensagens da Samantha.
-- Ajustada injeção dinâmica de idioma no OpenAI + definição inteligente baseada em DDI de telefone.
-- Documentações de operação (OPERATIONS.md) e integração futura com ERP/Odoo (ERP-INTEGRATION.md) criadas.
-
+- Milestone 1 finalizado e arquivado com sucesso (tag v1.0 criada).
+- Milestone 2 iniciado com foco na integração com o Instagram DMs via Meta Graph API.
+- Próximo passo imediato: `/gsd-plan-phase 7` para desenhar e executar o plano da Fase 7 (Webhook GET/POST Express).

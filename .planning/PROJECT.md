@@ -47,7 +47,16 @@ ARIA é um bot de atendimento ao cliente via WhatsApp, alimentado por IA (atualm
 
 <!-- Current scope. Building toward these. -->
 
-*(Aguardando a definição do Milestone 2 para ativação de novos requisitos)*
+**Canal Instagram & Webhooks (Milestone 2)**
+- [ ] INSTA-01: Endpoint Express (`/webhook/instagram` via GET) para validação de token da Meta.
+- [ ] INSTA-02: Endpoint Express (`/webhook/instagram` via POST) para recebimento de mensagens de texto de Direct Messages.
+- [ ] INSTA-03: Envio de respostas automáticas ao cliente usando a API de Envio da Meta.
+- [ ] INSTA-04: Suporte a múltiplos idiomas (ES/PT/EN) em tempo real nas DMs do Instagram.
+- [ ] INSTA-05: Gestão de histórico e sessão em memória sob formato de chave unificada `insta:<instagram_user_id>`.
+- [ ] INSTA-06: Proteção contra auto-takeover inserindo caractere invisível `\u200B` no final das DMs.
+- [ ] INSTA-07: Pausa automática (human takeover) da IA no Instagram ao detectar que o operador respondeu manualmente.
+- [ ] INSTA-08: Gravação de Leads no Google Sheets identificando a origem do canal como "Instagram".
+- [ ] INSTA-09: Gravação de Histórico consolidado de conversas do Instagram no Google Sheets.
 
 ### Out of Scope
 
