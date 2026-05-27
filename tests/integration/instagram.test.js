@@ -6,13 +6,47 @@ process.env.META_VERIFY_TOKEN = 'samantha_insta_verify_2026';
 process.env.META_APP_SECRET = '9268290c6b37cd45b214bffbc32f7892';
 process.env.INSTAGRAM_PAGE_ACCESS_TOKEN = 'EAA_TEST_TOKEN_123';
 
+// Mock da OpenAI para simular respostas da Samantha
+jest.unstable_mockModule('openai', () => {
+  return {
+    default: class {
+      constructor() {
+        this.chat = {
+          completions: {
+            create: jest.fn().mockImplementation(async () => {
+              return {
+                choices: [{
+                  message: {
+                    role: 'assistant',
+                    content: 'Olá! Sou a Samantha. Como posso ajudar?'
+                  },
+                  finish_reason: 'stop'
+                }]
+              };
+            })
+          }
+        };
+      }
+    }
+  };
+});
+
 // Mock do Session e Sheets para verificar chamadas de takeover
 const mockSetHumanTakeover = jest.fn();
 jest.unstable_mockModule('../../src/session.js', () => {
   return {
     setHumanTakeover: mockSetHumanTakeover,
     isHumanTakeover: jest.fn(),
-    getSession: jest.fn()
+    getSession: jest.fn().mockReturnValue({
+      language: 'pt',
+      lastLocalChange: 0
+    }),
+    incrementTurn: jest.fn(),
+    addTopic: jest.fn(),
+    closeSession: jest.fn().mockReturnValue({
+      phone: 'insta:user_456',
+      summary: 'Conversa no Instagram'
+    })
   };
 });
 
@@ -20,14 +54,16 @@ const mockUpdateBotStatusInSheets = jest.fn();
 jest.unstable_mockModule('../../src/sheets.js', () => {
   return {
     updateBotStatusInSheets: mockUpdateBotStatusInSheets,
-    getSystemInfo: jest.fn(),
-    getProducts: jest.fn(),
-    getFAQs: jest.fn(),
-    getBranches: jest.fn(),
-    getServices: jest.fn(),
+    getSystemInfo: async () => ({
+      nombre_empresa: 'Farmacia Americana'
+    }),
+    getProducts: async () => [],
+    getFAQs: async () => [],
+    getBranches: async () => [],
+    getServices: async () => [],
     appendLead: jest.fn(),
     appendHistory: jest.fn(),
-    fetchBotControlStatus: jest.fn(),
+    fetchBotControlStatus: async () => 'Ativo',
     onCacheRefresh: jest.fn()
   };
 });
@@ -36,7 +72,7 @@ jest.unstable_mockModule('../../src/sheets.js', () => {
 const { handleGETVerification, handlePOSTWebhook } = await import('../../src/handlers/instagramWebhook.js');
 const { sendInstagramMessage } = await import('../../src/services/instagram.js');
 
-describe('Testes de Webhook do Instagram (Meta Graph API) — Phase 7 & 8', () => {
+describe('Testes de Webhook do Instagram (Meta Graph API) — Phase 7, 8 & 9', () => {
   let mockRes;
 
   beforeEach(() => {
@@ -211,6 +247,63 @@ describe('Testes de Webhook do Instagram (Meta Graph API) — Phase 7 & 8', () =
     // Takeover NÃO deve ser acionado
     expect(mockSetHumanTakeover).not.toHaveBeenCalled();
     expect(mockUpdateBotStatusInSheets).not.toHaveBeenCalled();
+  });
+
+  // ── Teste E2E de Mensagem do Cliente e Resposta Automatizada ─────────────────
+
+  test('Deve processar mensagem do cliente, chamar a OpenAI e enviar resposta de volta', async () => {
+    global.fetch = jest.fn().mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ message_id: 'mid_999' })
+      })
+    );
+
+    const payload = {
+      object: 'instagram',
+      entry: [
+        {
+          id: 'page_123',
+          messaging: [
+            {
+              sender: { id: 'user_456' },
+              recipient: { id: 'page_123' },
+              message: {
+                text: 'olá'
+              }
+            }
+          ]
+        }
+      ]
+    };
+
+    const rawBody = JSON.stringify(payload);
+    const hash = crypto.createHmac('sha256', process.env.META_APP_SECRET).update(rawBody).digest('hex');
+    const mockReq = {
+      method: 'POST',
+      headers: { 'x-hub-signature-256': `sha256=${hash}` }
+    };
+
+    handlePOSTWebhook(mockReq, mockRes, rawBody);
+
+    expect(mockRes.writeHead).toHaveBeenCalledWith(200, { 'Content-Type': 'text/plain' });
+    expect(mockRes.end).toHaveBeenCalledWith('EVENT_RECEIVED');
+
+    // Aguardar o processamento assíncrono do IIFE
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    // Verificar se o fetch do sendInstagramMessage enviou a resposta da OpenAI de volta ao cliente
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('https://graph.facebook.com/v19.0/me/messages'),
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient: { id: 'user_456' },
+          message: { text: 'Olá! Sou a Samantha. Como posso ajudar?\u200B' }
+        })
+      })
+    );
   });
 
   // ── Testes de Serviço de Envio API ─────────────────────────────────────────

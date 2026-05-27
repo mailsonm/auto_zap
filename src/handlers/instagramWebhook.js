@@ -115,6 +115,30 @@ export function handlePOSTWebhook(req, res, rawBody) {
           recipientId,
           text: messageText
         });
+
+        // Executa o processamento do roteador e envio de forma assíncrona para não travar a resposta HTTP (Meta Webhook timeout)
+        (async () => {
+          try {
+            const clientPhone = `insta:${senderId}`;
+            const msgAdapter = {
+              from: clientPhone,
+              body: messageText,
+              isGroupMsg: false
+            };
+
+            const { handleMessage } = await import('./router.js');
+            const { SAMANTHA_TOOLS, executeTool } = await import('../tools/index.js');
+            
+            const responseText = await handleMessage(msgAdapter, { tools: SAMANTHA_TOOLS, executeTool });
+
+            if (responseText) {
+              const { sendInstagramMessage } = await import('../services/instagram.js');
+              await sendInstagramMessage(senderId, responseText);
+            }
+          } catch (err) {
+            logger.error('Erro ao processar e responder DM do Instagram', { senderId, error: err.message });
+          }
+        })();
       }
     }
 

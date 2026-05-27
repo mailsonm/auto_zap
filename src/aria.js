@@ -11,16 +11,17 @@
 /**
  * Constrói o system prompt completo com dados da empresa injetados.
  * @param {object} company — dados de getSystemInfo() do Google Sheets
+ * @param {string} channel — canal de comunicação
  * @returns {string}
  */
-export function buildSystemPrompt(company = {}) {
+export function buildSystemPrompt(company = {}, channel = 'WhatsApp') {
   const companyName = company.nombre_empresa || company.empresa || 'la empresa';
   const companyPhone = company.telefono || '';
   const companyAddress = company.direccion || '';
   const companyHours = company.horario || '';
   const companyExtra = company.informacion_extra || '';
 
-  return `Eres Samantha, asistente virtual de ${companyName} en WhatsApp.
+  return `Eres Samantha, asistente virtual de ${companyName} en ${channel}.
 
 ## Tu Personalidad
 - Eres cálida, amigable e informal — como una persona real, no un robot
@@ -83,12 +84,12 @@ let cachedCompanyData = null;
  * @param {object} company
  * @returns {string}
  */
-export function getSystemPrompt(company = {}) {
-  const companyKey = JSON.stringify(company);
+export function getSystemPrompt(company = {}, channel = 'WhatsApp') {
+  const companyKey = `${JSON.stringify(company)}:${channel}`;
   if (cachedPrompt && cachedCompanyData === companyKey) {
     return cachedPrompt;
   }
-  cachedPrompt = buildSystemPrompt(company);
+  cachedPrompt = buildSystemPrompt(company, channel);
   cachedCompanyData = companyKey;
   return cachedPrompt;
 }

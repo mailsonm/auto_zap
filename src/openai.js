@@ -120,7 +120,8 @@ export async function chat(phone, userMessage, options = {}) {
     logger.warn('Não foi possível carregar dados da empresa', { error: err.message });
   }
 
-  let systemPrompt = getSystemPrompt(companyData);
+  const channel = phone.startsWith('insta:') ? 'Instagram' : 'WhatsApp';
+  let systemPrompt = getSystemPrompt(companyData, channel);
   if (session.language) {
     const langNames = { es: 'español (Spanish)', pt: 'portugués (Portuguese)', en: 'inglés (English)' };
     const targetLang = langNames[session.language] || 'español (Spanish)';
