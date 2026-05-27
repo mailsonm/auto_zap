@@ -9,6 +9,8 @@
 
 import logger from '../logger.js';
 import { validateMetaSignature } from '../middleware/metaSignature.js';
+import { setHumanTakeover } from '../session.js';
+import { updateBotStatusInSheets } from '../sheets.js';
 
 /**
  * Processar requisição GET de verificação da assinatura do Webhook.
@@ -80,11 +82,30 @@ export function handlePOSTWebhook(req, res, rawBody) {
     for (const entry of entries) {
       const messagingEvents = entry.messaging || [];
       for (const event of messagingEvents) {
-        // Ignora se não for evento de mensagem ou for mensagem de entrega/lida
-        if (!event.message || event.message.is_echo) {
+        // Ignora se não for evento de mensagem
+        if (!event.message) {
           continue;
         }
 
+        // Se for uma mensagem ecoada (enviada pela própria página comercial)
+        if (event.message.is_echo) {
+          const text = event.message.text || '';
+          
+          // Se não contiver o caractere invisível \u200B, foi uma intervenção manual do atendente
+          if (!text.includes('\u200B')) {
+            const clientPhone = `insta:${event.recipient.id}`;
+            logger.info('Meta Webhook: Intervenção humana detectada no Instagram (mensagem manual enviada)', { to: clientPhone });
+            
+            // Ativar takeover localmente e sincronizar com Google Sheets
+            setHumanTakeover(clientPhone, true);
+            updateBotStatusInSheets(clientPhone, 'Pausado (Humano)');
+          } else {
+            logger.debug('Meta Webhook: Ignorando eco enviado pelo próprio bot', { recipientId: event.recipient.id });
+          }
+          continue;
+        }
+
+        // Mensagem vinda do cliente
         const senderId = event.sender.id;
         const recipientId = event.recipient.id;
         const messageText = event.message.text || '';
