@@ -26,3 +26,8 @@ Thumbs.db
 
 # Testes
 coverage/
+
+# Scratch e scripts temporários
+scratch/
+scratch_*.js
+

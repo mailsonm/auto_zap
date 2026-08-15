@@ -13,6 +13,7 @@ import http from 'http';
 import logger from './logger.js';
 import { sessions } from './openai.js';
 import { handleGETVerification, handlePOSTWebhook } from './handlers/instagramWebhook.js';
+import { handleManyChatWebhook } from './handlers/manychatWebhook.js';
 
 // Estado interno do módulo (atualizado via setWAConnected)
 let waConnected = false;
@@ -56,6 +57,18 @@ export function startHealthServer() {
       });
       req.on('end', () => {
         handlePOSTWebhook(req, res, body);
+      });
+      return;
+    }
+
+    // ── Rota: ManyChat Webhook POST ──────────────────────────────────────────
+    if (req.method === 'POST' && urlPath === '/webhook/manychat') {
+      let body = '';
+      req.on('data', chunk => {
+        body += chunk.toString();
+      });
+      req.on('end', () => {
+        handleManyChatWebhook(req, res, body);
       });
       return;
     }

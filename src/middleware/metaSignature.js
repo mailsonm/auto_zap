@@ -21,8 +21,12 @@ export function validateMetaSignature(rawBody, signatureHeader) {
   const appSecret = process.env.META_APP_SECRET;
 
   if (!appSecret) {
-    logger.warn('META_APP_SECRET não configurada no .env. Validação de assinatura pulada!');
-    return true; // Se não configurado localmente, permitir para testes simples
+    if (process.env.NODE_ENV === 'production') {
+      logger.error('CRÍTICO: META_APP_SECRET não configurada em produção! Rejeitando requisição do webhook por segurança.');
+      return false;
+    }
+    logger.warn('META_APP_SECRET não configurada no .env. Validação de assinatura pulada em desenvolvimento.');
+    return true; // Permitir em desenvolvimento apenas se META_APP_SECRET estiver ausente
   }
 
   if (!signatureHeader) {
@@ -46,11 +50,15 @@ export function validateMetaSignature(rawBody, signatureHeader) {
       .update(rawBody)
       .digest('hex');
 
+    const providedBuf = Buffer.from(providedSignature, 'utf8');
+    const computedBuf = Buffer.from(computedSignature, 'utf8');
+
+    if (providedBuf.length !== computedBuf.length) {
+      return false;
+    }
+
     // Compara em tempo constante para mitigar ataques de timing
-    return crypto.timingSafeEqual(
-      Buffer.from(providedSignature, 'utf8'),
-      Buffer.from(computedSignature, 'utf8')
-    );
+    return crypto.timingSafeEqual(providedBuf, computedBuf);
   } catch (err) {
     logger.error('Erro ao validar assinatura da Meta', { error: err.message });
     return false;
